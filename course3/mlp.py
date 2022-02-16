@@ -12,12 +12,12 @@ class MLP(nn.Module):
     def __init__(self, input_dim:int, output_dim:int):
         super().__init__()
 
-        self.fc_in = nn.Linear(input_dim, 100)
-        self.fc1 = nn.Linear(100, 20)
+        self.fc_in = nn.Linear(input_dim, 500)
+        self.fc1 = nn.Linear(500, 100)
+        self.fc2 = nn.Linear(100, 20)
         self.fc_out = nn.Linear(20, output_dim)
         
         self.relu = nn.ReLU()
-        self.softmax = nn.Softmax(dim = -1)
         
 
     def forward(self, x: torch.Tensor) -> torch.Tensor : 
@@ -28,10 +28,11 @@ class MLP(nn.Module):
         out = self.fc1(out)
         out = self.relu(out)
         
-        out = self.fc_out(out)
-        y_pred = self.softmax(out)
-
-
+        out = self.fc2(out)
+        out = self.relu(out)
+        
+        y_pred = self.fc_out(out)
+        
         return y_pred 
 
 if __name__=='__main__': 

@@ -1,10 +1,10 @@
 import torch
 from torch.utils.data import Dataset, DataLoader, SubsetRandomSampler
-
+import torch.nn.functional as F
 import numpy as np
 
 class OurMeeroRoomsDataset(Dataset):
-    def __init__(self, np_file_path,test_size):
+    def __init__(self, np_X_path,np_Y_path,test_size):
         """
         The class OurMeeroRoomsDataset is responsible for creating 
         the batch of data that are going to be feed to our neural network.
@@ -14,12 +14,13 @@ class OurMeeroRoomsDataset(Dataset):
             test_size ([float]): Proportion of data kept for testing the neural network performance. 
         """
         
-        data = np.load(np_file_path)
+        dataX = np.load(np_X_path)
+        labelY = np.load(np_Y_path)
         
-        self.X = data['X']
-        self.Y = data['Y']    
+        self.X = dataX
+        self.Y = np.expand_dims(labelY, -1)
         
-        self.train_idx, self.test_idx = self.get_train_test_split_idx()
+        self.train_idx, self.test_idx = self.get_train_test_split_idx(test_size)
         
     def get_train_test_split_idx(self,test_size):
         nb_samples = self.__len__()
@@ -31,8 +32,8 @@ class OurMeeroRoomsDataset(Dataset):
         
     def __getitem__(self, index):
        
-        x = torch.from_numpy(self.X[index,:])
-        y = torch.from_numpy(self.Y[index,:])
+        x = torch.from_numpy(self.X[index,:].astype(np.float32))
+        y = torch.from_numpy(self.Y[index].astype(np.int64)) 
         
         return x,y
     
@@ -41,12 +42,15 @@ class OurMeeroRoomsDataset(Dataset):
     
 if __name__== '__main__': 
    
-    dataset = OurMeeroRoomsDataset(np_file_path = './testData.npz',test_size = 0.2)
+    dataset = OurMeeroRoomsDataset(np_X_path = '/data2/datasets/x.npy',
+                                   np_Y_path= '/data2/datasets/y.npy',
+                                   test_size = 0.2)
    
     train_sampler = SubsetRandomSampler(dataset.train_idx)
     test_sampler = SubsetRandomSampler(dataset.test_idx)
 
-    train_loader = DataLoader(dataset, batch_size = 4, sampler=train_sampler)
-    test_loader  = DataLoader(dataset, batch_size = 4, sampler=test_sampler)
+    train_loader = DataLoader(dataset, batch_size = 32, sampler=train_sampler)
+    test_loader  = DataLoader(dataset, batch_size = 32, sampler=test_sampler)
     
-      
+    for (x,y) in train_loader: 
+        print(x.shape,y.shape)
