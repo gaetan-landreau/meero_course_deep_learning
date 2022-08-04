@@ -11,7 +11,7 @@ import tqdm
 from PIL import Image
 
 
-class MeeroRoomsDatasetNPY(Dataset):
+class MeeroRoomsDatasetFeatures(Dataset):
     def __init__(self, np_X_path, np_Y_path, test_size):
         """
         The class OurMeeroRoomsDataset is responsible for creating

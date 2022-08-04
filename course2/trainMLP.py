@@ -1,7 +1,10 @@
+from modelMLP import MLP
+from dataset import MeeroRoomsDatasetNPY
+
 import torch
-from dataset import OurMeeroRoomsDataset, DataLoader, SubsetRandomSampler
+from torch.utils.data import DataLoader, SubsetRandomSampler
 import torch.nn as nn
-from mlp import MLP
+
 from tqdm import trange
 import numpy as np
 
@@ -20,7 +23,7 @@ def train():
 
     # Dataset building.
 
-    dataset = OurMeeroRoomsDataset(
+    dataset = MeeroRoomsDatasetNPY(
         np_X_path="/data2/datasets/x.npy",
         np_Y_path="/data2/datasets/y.npy",
         test_size=0.2,

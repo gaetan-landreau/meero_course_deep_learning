@@ -1,6 +1,6 @@
 
 from dataset import MeeroRoomsDataset
-from model import RoomsModel
+from modelCNN import RoomsModel
 
 import torch 
 from torch.utils.data import DataLoader, SubsetRandomSampler
