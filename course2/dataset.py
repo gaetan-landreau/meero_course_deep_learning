@@ -84,7 +84,7 @@ class MeeroRoomsDataset(Dataset):
         X = []
         Y = []
         print(f"--> Building .npy files from rooms contained in {self.indir} ...")
-        for room in tqdm.tqdm(self.rooms[:1]):
+        for room in tqdm.tqdm(self.rooms):
             print(f"--> Processing room {room} ...")
             room_path = os.path.join(self.indir, room)
             imgs = [
