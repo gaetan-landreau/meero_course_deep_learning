@@ -1,5 +1,5 @@
-from modelMLP import MLP
-from dataset import MeeroRoomsDatasetNPY
+from course2.models.mlp import MLP
+from course2.data.dataset import MeeroRoomsDatasetNPY
 
 import torch
 from torch.utils.data import DataLoader, SubsetRandomSampler
