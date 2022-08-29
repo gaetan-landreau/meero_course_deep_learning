@@ -1,17 +1,21 @@
 
-from dataset import MeeroRoomsDataset
-from modelCNN import RoomsModel
+from data.dataset import MeeroRoomsDataset
+from models.cnn import RoomsModel
+
+from utils.utils_data import create_loaders
+from utils.utils_metrics import Accuracy, Precision, Recall, F1Score, ConfusionMatrix
 
 import torch 
-from torch.utils.data import DataLoader, SubsetRandomSampler
 from torch.optim import Adam
 from torch import nn
-from torchmetrics.classification import Accuracy
+
 
 import numpy as np
 import yaml
 from tqdm import trange 
 
+def train_epoch():
+    return 
 def train(config):
     ##################
     ## Main parameters
@@ -20,58 +24,43 @@ def train(config):
     bs = config["hyperparameters"]["batch_size"]
     learning_rate = config['hyperparameters']['learning_rate']
    
+    nb_classes= config["model"]["num_classes"]
+    fine_tune = config["model"]["fine_tunning"]
+    
     indir = config["data"]["indir"]
+    outdir = config["data"]["outdir"]
     
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu") # Define your execution device
     
     train_accuracy = Accuracy().to(device)
     val_accuracy = Accuracy().to(device)
     
-    ################################
-    # Data loading and preprocessing
-    ################################
-
+    ############################
+    # Dataset creation / loading
+    ############################
     dataset = MeeroRoomsDataset(indir)
-
-    dataset_size = len(dataset)
-    indices = list(range(dataset_size))
-
-    np.random.seed(42)
-    np.random.shuffle(indices)
-
-    split = int(np.floor(config["split"]["val"] * dataset_size))
-
-    train_indices, val_indices = indices[split:], indices[:split]
-
-    # Creating PT data samplers and loaders:
-    train_sampler = SubsetRandomSampler(train_indices)
-    valid_sampler = SubsetRandomSampler(val_indices)
-
-    train_loader = DataLoader(
-        dataset, batch_size=bs, sampler=train_sampler
-    )
-
-    validation_loader = DataLoader(
-        dataset, batch_size=bs, sampler=valid_sampler
-    )
-
-    #########################################
-    ## Model instantiation - Loss / Optimizer
-    #########################################
+    train_loader, validation_loader = create_loaders(dataset, bs, split= config['split'])
     
-    model = RoomsModel()
-    model.to(device)
+    ######################
+    ## Model instantiation
+    ######################
+    model = RoomsModel(fine_tune=fine_tune, num_classes=nb_classes).to(device)
     model.train()
     
+    ###################
+    ## Loss / optimizer
+    ###################
     lossCE = nn.CrossEntropyLoss()
     optimizer = Adam(model.parameters(), lr=learning_rate, weight_decay=0.0001)
     
+    ################
+    ## Training loop
+    ################
     pbar = trange(num_epochs, desc="Epochs")
     for _ in pbar:
-        # Train:   
+        # Train stage
         for batch_index, (imgs, labels) in enumerate(train_loader):
             
-           
             imgs = imgs.to(device)
             labels = labels.to(device)
             
@@ -84,9 +73,9 @@ def train(config):
             loss.backward()
             # adjust parameters based on the calculated gradients
             optimizer.step()
-          
+
             train_batch_acc = train_accuracy(preds, labels.type(torch.int8))
-           
+        
         # Validation stage.  
         model.eval()
         for batch_index, (imgs, labels) in enumerate(validation_loader):

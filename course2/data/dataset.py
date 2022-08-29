@@ -1,8 +1,9 @@
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset,DataLoader
+import torch.nn.functional as F
+
 import torchvision.transforms as T
 
-import torch.nn.functional as F
 
 import numpy as np
 import os
@@ -99,7 +100,7 @@ class MeeroRoomsDataset(Dataset):
             for img in imgs:
 
                 img = cv2.imread(os.path.join(room_path, img))
-                img = img[:, :, ::-1]
+                img = img[:, :, ::-1]   # BGR to RGB (might also use cv2.cvtColor(img, cv2.COLOR_BGR2RGB) to convert to RGB)
 
                 X.append(img)
                 Y.append(label)
@@ -121,20 +122,33 @@ class MeeroRoomsDataset(Dataset):
         return self.rooms_list
 
     @staticmethod
-    def transform(img: np.array) -> torch.Tensor:
-        # Convert the np.array image to a PIL one. (required for torchvision.transforms)
-        img = Image.fromarray(img)
+    def transform_train(img: np.array) -> torch.Tensor:
 
         transform = T.Compose(
             [
-                T.Resize((456, 456)),
+                T.ToPILImage(), # required for torchvision.transforms
+                T.Resize((256,256)),   
                 T.RandomHorizontalFlip(p=0.5),
                 T.ToTensor(),
-                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
             ]
         )
-
         return transform(img)
+    
+    @staticmethod
+    def transform_val(img:np.array) -> torch.Tensor:
+        # Quite similar to transform_train, but no horizontal flip (meaning no data augmentation). 
+        transform = T.Compose(
+            [
+                T.ToPILImage(), 
+                T.Resize((256,256)),
+                T.ToTensor(),
+                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ]
+        )
+        
+        return transform(img) 
+
 
     def __len__(self) -> int:
         return self.X.shape[0]
@@ -147,7 +161,7 @@ class MeeroRoomsDataset(Dataset):
             torch.from_numpy(np.array(label)), num_classes=len(self.rooms)
         ).float()
 
-        img = MeeroRoomsDataset.transform(img)
+        img = MeeroRoomsDataset.transform_train(img)
 
         return img, label
 
@@ -155,3 +169,8 @@ class MeeroRoomsDataset(Dataset):
 if __name__ == "__main__":
 
     dataset = MeeroRoomsDataset(indir="/data2/datasets/sourceImgs/all")
+    
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, transform=dataset.transform_train)
+    
+    x,y = dataloader[0]
+    
