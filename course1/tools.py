@@ -54,7 +54,7 @@ def auto_padding(im, k=16, s=8):
     n_im[id_w:id_w+w, id_h:id_h+h] = im
     return n_im
 
-def conv_separable(im, h_x, h_y, pad=1):
+def conv_separable(im, h_y, h_x, pad=1):
     h_x = h_x.reshape(1,3)
     h_y = h_y.reshape(3,1)
 
