@@ -54,7 +54,7 @@ def auto_padding(im, k=16, s=8):
     n_im[id_w:id_w+w, id_h:id_h+h] = im
     return n_im
 
-def conv_separable(im, h_x, h_y, pad=1):
+def conv_separable(im, h_y, h_x, pad=1):
     h_x = h_x.reshape(1,3)
     h_y = h_y.reshape(3,1)
 
@@ -347,6 +347,24 @@ def get_regions_and_sifts(dir_sc, inames, image_sifts):
     sift = [s.reshape(-1, image_sifts[0].shape[-1]) for s in image_sifts]
     sift = np.concatenate(sift, axis=0)
     return regions, sift
+
+def get_regions_and_sifts_from_dir(im_paths, image_sifts):
+  regions = []
+  for path in im_paths:
+      im = tools.read_grayscale(path)
+      regions.append(tools.compute_regions(im))
+
+  k = regions[0].shape[-1]
+  n_reg = np.array([r.shape[0]*r.shape[1] for r in regions])
+  cs_reg = np.cumsum(n_reg)
+
+  regions = [r.reshape(-1, k, k) for r in regions]
+  regions = np.concatenate(regions, axis=0)
+
+  sift = [s.reshape(-1, image_sifts[0].shape[-1]) for s in image_sifts]
+  sift = np.concatenate(sift, axis=0)
+  return regions, sift
+  
 
 def display_images(images):
     n_images,w,h = images.shape
