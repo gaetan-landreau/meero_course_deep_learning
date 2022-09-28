@@ -1,8 +1,7 @@
 import torch
-from torch.utils.data import Dataset,DataLoader
+from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
-
-import torchvision.transforms as T
+from torchvision.datasets import DatasetFolder
 
 
 import numpy as np
@@ -10,45 +9,6 @@ import os
 import cv2
 import tqdm
 from PIL import Image
-
-
-class MeeroRoomsDatasetFeatures(Dataset):
-    def __init__(self, np_X_path, np_Y_path, test_size):
-        """
-        The class OurMeeroRoomsDataset is responsible for creating
-        the batch of data that are going to be feed to our neural network.
-
-        Args:
-            np_file_path ([str]): Path toward the .npz file that contain both our SIFT descriptor and labels.
-            test_size ([float]): Proportion of data kept for testing the neural network performance.
-        """
-
-        dataX = np.load(np_X_path)
-        labelY = np.load(np_Y_path)
-
-        self.X = dataX
-        self.Y = np.expand_dims(labelY, -1)
-
-        self.train_idx, self.test_idx = self.get_train_test_split_idx(test_size)
-
-    def get_train_test_split_idx(self, test_size):
-        nb_samples = self.__len__()
-        indices = list(range(nb_samples))
-        np.random.shuffle(indices)
-        split = int(np.floor(test_size * nb_samples))
-
-        return indices[split:], indices[:split]
-
-    def __getitem__(self, index):
-
-        x = torch.from_numpy(self.X[index, :].astype(np.float32))
-        y = torch.from_numpy(self.Y[index].astype(np.int64))
-
-        return x, y
-
-    def __len__(self):
-        return self.X.shape[0]
-
 
 class MeeroRoomsDataset(Dataset):
     """
@@ -61,116 +21,114 @@ class MeeroRoomsDataset(Dataset):
     Labels are one-hot encoded.
     """
 
-    def __init__(self, indir: str):
+    def __init__(self, indir: str, is_train: bool, transform_fn):
+        """_summary_
+
+        Args:
+            indir (str): _description_
+            is_train (bool): _description_
+            transform_fn (_type_): _description_
+        """
         # Input directory where all the images are stored.
         self.indir = indir
-        # List the different rooms in the input directory.
+
+        # Set the flag to know if we are training or testing.
+        self.is_train = is_train
+
+        # Transformation pipeline.
+        self.transform = transform_fn
+
+        # Get the list of rooms.
         self.rooms = self.get_rooms_list()
-
-        # Pre-load all the images and their corresponding labels.
-        npy_files_exist = os.path.exists(self.indir + "/X.npy") and os.path.exists(
-            self.indir + "/Y.npy"
-        )
-        self.X, self.Y = (
-            self.load_dataset() if npy_files_exist else self.build_dataset()
-        )
-
-    def load_dataset(self):
-        print(f"--> Loading dataset from existing .npy files ...")
-        X = np.load(self.indir + "/X.npy", allow_pickle=True)
-        Y = np.load(self.indir + "/Y.npy", allow_pickle=True)
-        return X, Y
-
-    def build_dataset(self):
-        X = []
-        Y = []
-        print(f"--> Building .npy files from rooms contained in {self.indir} ...")
-        for room in tqdm.tqdm(self.rooms):
-            print(f"--> Processing room {room} ...")
-            room_path = os.path.join(self.indir, room)
-            imgs = [
-                f
-                for f in os.listdir(room_path)
-                if os.path.isfile(os.path.join(room_path, f))
-            ]
-
-            label = self.rooms.index(room)
-            label = np.array(label)
-
-            for img in imgs:
-
-                img = cv2.imread(os.path.join(room_path, img))
-                img = img[:, :, ::-1]   # BGR to RGB (might also use cv2.cvtColor(img, cv2.COLOR_BGR2RGB) to convert to RGB)
-
-                X.append(img)
-                Y.append(label)
-
-        # Save both x and y as .npy files
-        np.save(self.indir + "/X.npy", X, allow_pickle=True)
-        np.save(self.indir + "/Y.npy", Y, allow_pickle=True)
-
-        return X, Y
-
+        
+        # Load the images and their corresponding labels.
+        self.imgs, self.labels = self.get_images_list()
+        
     def get_rooms_list(self) -> list:
-        self.rooms_list = sorted(
+        rooms =  sorted(
             [
                 dir
                 for dir in os.listdir(self.indir)
                 if os.path.isdir(os.path.join(self.indir, dir))
             ]
         )
-        return self.rooms_list
-
-    @staticmethod
-    def transform_train(img: np.array) -> torch.Tensor:
-
-        transform = T.Compose(
-            [
-                T.ToPILImage(), # required for torchvision.transforms
-                T.Resize((256,256)),   
-                T.RandomHorizontalFlip(p=0.5),
-                T.ToTensor(),
-                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-            ]
-        )
-        return transform(img)
-    
-    @staticmethod
-    def transform_val(img:np.array) -> torch.Tensor:
-        # Quite similar to transform_train, but no horizontal flip (meaning no data augmentation). 
-        transform = T.Compose(
-            [
-                T.ToPILImage(), 
-                T.Resize((256,256)),
-                T.ToTensor(),
-                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-            ]
-        )
         
-        return transform(img) 
-
-
+        return rooms
+        
+    def get_images_list(self):
+        # Build up two empty lists.
+        imgs = []
+        labels = []
+        
+        #Iterate over each room
+        for room in self.rooms:
+            y = self.rooms.index(room)
+            
+            for img in os.listdir(os.path.join(self.indir, room)):
+                full_path_img = os.path.join(self.indir, room, img)
+                imgs.append(full_path_img)
+                labels.append(y)
+                
+        # Shuffle the images and labels (in the same order)
+        data = list(zip(imgs, labels))
+        imgs, labels = zip(*data)
+        
+        return imgs, labels
+    
     def __len__(self) -> int:
-        return self.X.shape[0]
+        return len(self.imgs)
 
     def __getitem__(self, index):
-        img, label = self.X[index], self.Y[index]
-
-        # Convert to tensor and perform data augmentation.
-        label = F.one_hot(
-            torch.from_numpy(np.array(label)), num_classes=len(self.rooms)
-        ).float()
-
-        img = MeeroRoomsDataset.transform_train(img)
+        img, label = self.imgs[index], self.labels[index]
+        
+        # Read the image / apply the transformation pipeline.
+        img = cv2.imread(img)[:,:,::-1]  # BGR to RGB
+        img = self.transform(img)
+        
+        # Convert the [int] label into a [torch.tensor] (required for loss computation)
+        label = torch.tensor(label).long()
 
         return img, label
 
 
 if __name__ == "__main__":
+    import sys 
+    sys.path.append('..')
+    from utils.utils_data import transform_fn
+    
+    transform = transform_fn()['train']
+    dataset = MeeroRoomsDataset(indir="/data2/datasets/sourceImgs/all", is_train=True, transform_fn=transform)
+    print(len(dataset))
+    
+    y = torch.tensor([4])
+    #y[1] = 1.
+    
+    y_pred = torch.tensor([[ 0.1040,  0.0115,  0.0186,  0.0653,  0.0202,  0.0427,  0.0075,  0.0189,
+          0.0579, -0.0183, -0.0208]])
+    y_pred_exp = torch.exp(y_pred)
+    
+    y_pred_soft = torch.nn.Softmax(dim=-1)(y_pred)
+    
+    sum_exp = torch.sum(y_pred_exp)
+    
+    print(torch.log(y_pred_exp/sum_exp))
+    print(torch.log(y_pred_soft))
+    
+    #y1 = torch.tensor([0.,0.91,0.02,0.03,0.0,0.,0.02,0.01,0.01,0.,0.]).float()
+    #y1 = torch.tensor([0.,1.,0.0,0.0,0.0,0.,0.0,0.0,0.0,0.,0.]).float()
 
-    dataset = MeeroRoomsDataset(indir="/data2/datasets/sourceImgs/all")
+    #y2 = torch.tensor([0.,0.12,0.0,0.21,0.09,0.01,0.27,0.03,0.17,0.,0.]).float()   
     
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True, transform=dataset.transform_train)
+    from torch.nn import CrossEntropyLoss
     
-    x,y = dataloader[0]
+    l1 = CrossEntropyLoss()(y_pred, y)
+    
+    #l2 = CrossEntropyLoss()(y2.unsqueeze(0), y.unsqueeze(0))
+    print(l1)
+    #print(l1)
+    #print(l2)
+    
+    #x,y = dataset[80]
+    
+    
     
